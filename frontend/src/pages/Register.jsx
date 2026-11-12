@@ -27,16 +27,21 @@ export default function Register() {
   };
 
   return (
-    <div className="page-narrow">
+    <div className="page-narrow auth-page">
+      <p className="eyebrow">Join the conversation</p>
       <h1>Create your account</h1>
+      <p className="form-intro">
+        A few details are all you need to start sharing your stories.
+      </p>
 
-      <form className="form" onSubmit={onSubmit} noValidate>
-        {error && <p className="form-error">{error}</p>}
+      <form className="form form-panel" onSubmit={onSubmit} noValidate>
+        {error && <p className="form-error" role="alert">{error}</p>}
 
         <label className="field">
           <span>Name</span>
           <input
             name="name"
+            autoComplete="name"
             value={form.name}
             onChange={onChange}
             placeholder="Ada Lovelace"
@@ -49,6 +54,7 @@ export default function Register() {
           <input
             type="email"
             name="email"
+            autoComplete="email"
             value={form.email}
             onChange={onChange}
             placeholder="you@example.com"
@@ -61,12 +67,14 @@ export default function Register() {
           <input
             type="password"
             name="password"
+            autoComplete="new-password"
             value={form.password}
             onChange={onChange}
             placeholder="At least 6 characters"
             minLength={6}
             required
           />
+          <span className="field-hint">Use at least 6 characters.</span>
         </label>
 
         <button className="btn btn-gold btn-block" type="submit" disabled={submitting}>

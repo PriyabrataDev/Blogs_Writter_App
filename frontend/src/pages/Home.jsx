@@ -50,10 +50,20 @@ export default function Home() {
     setQuery(search.trim());
   };
 
+  const clearSearch = () => {
+    setSearch("");
+    setPage(1);
+    setQuery("");
+  };
+
   return (
     <>
       <section className="hero">
+        <p className="eyebrow">A community for curious minds</p>
         <h1>Stories worth sharing.</h1>
+        <p className="hero-description">
+          Ideas, experiences, and little discoveries — told by people like you.
+        </p>
         <form onSubmit={submitSearch} className="search">
           <input
             value={search}
@@ -61,13 +71,41 @@ export default function Home() {
             placeholder="Search posts or tags…"
             aria-label="Search posts"
           />
-          <button className="btn btn-gold" type="submit">
-            Search
-          </button>
+          <div className="search-actions">
+            <button className="btn btn-gold" type="submit">
+              Search
+            </button>
+            {(search || query) && (
+              <button
+                className="btn btn-outline"
+                type="button"
+                onClick={clearSearch}
+                aria-label="Clear search"
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </form>
+        <p className="search-hint">Find your next read by title or tag.</p>
       </section>
 
       {error && <p className="error-banner">{error}</p>}
+
+      {!error && (
+        <section className="feed-heading" aria-live="polite">
+          <div>
+            <p className="eyebrow">{query ? "Your search" : "The Inkwell feed"}</p>
+            <h2>{query ? "Search results" : "Latest stories"}</h2>
+          </div>
+          {!loading && (
+            <p className="feed-count">
+              {total} {total === 1 ? "story" : "stories"}
+              {query ? ` for “${query}”` : " to explore"}
+            </p>
+          )}
+        </section>
+      )}
 
       {loading ? (
         <Loader label="Fetching stories…" />

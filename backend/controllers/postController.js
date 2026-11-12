@@ -7,22 +7,42 @@ const escapeRegex = (text = "") => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const toTagList = (tags) =>
   Array.isArray(tags)
-    ? tags.map((t) => String(t).trim()).filter(Boolean)
+    ? tags.map((tag) => tag.trim()).filter(Boolean)
     : String(tags)
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean);
 
+const parseQueryInteger = (value, name, fallback, maximum) => {
+  if (value === undefined) return fallback;
+
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > maximum) {
+    const error = new Error(`${name} must be between 1 and ${maximum}`);
+    error.status = 400;
+    throw error;
+  }
+
+  return parsed;
+};
+
 // @desc    List posts (paginated + search)
 // @route   GET /api/posts?page=1&search=react
 // @access  Public
 export const getPosts = asyncHandler(async (req, res) => {
-  const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-  const limit = Math.min(
-    Math.max(parseInt(req.query.limit, 10) || 9, 1),
-    50
-  );
+  const page = parseQueryInteger(req.query.page, "page", 1, 1000);
+  const limit = parseQueryInteger(req.query.limit, "limit", 9, 50);
+  if (req.query.search !== undefined && typeof req.query.search !== "string") {
+    const error = new Error("search must be a string");
+    error.status = 400;
+    throw error;
+  }
   const search = (req.query.search || "").trim();
+  if (search.length > 100) {
+    const error = new Error("search cannot exceed 100 characters");
+    error.status = 400;
+    throw error;
+  }
 
   const filter = {};
   if (search) {
@@ -31,16 +51,20 @@ export const getPosts = asyncHandler(async (req, res) => {
   }
 
   const total = await Post.countDocuments(filter);
-  const posts = await Post.find(filter)
-    .sort({ createdAt: -1 })
-    .skip((page - 1) * limit)
-    .limit(limit)
-    .populate("author", "name avatar");
+  const pages = Math.ceil(total / limit);
+  const posts =
+    page > pages
+      ? []
+      : await Post.find(filter)
+          .sort({ createdAt: -1, _id: -1 })
+          .skip((page - 1) * limit)
+          .limit(limit)
+          .populate("author", "name avatar");
 
   res.json({
     posts,
     page,
-    pages: Math.ceil(total / limit) || 1,
+    pages: pages || 1,
     total,
   });
 });
@@ -68,16 +92,38 @@ export const getPostById = asyncHandler(async (req, res) => {
 export const createPost = asyncHandler(async (req, res) => {
   const { title, content, coverImage = "", tags = [] } = req.body;
 
-  if (!title?.trim() || !content?.trim()) {
+  if (
+    typeof title !== "string" ||
+    typeof content !== "string" ||
+    !title.trim() ||
+    !content.trim()
+  ) {
     res.status(400);
     throw new Error("Title and content are required");
   }
+  if (typeof coverImage !== "string") {
+    res.status(400);
+    throw new Error("Cover image must be a URL");
+  }
+  if (!Array.isArray(tags) && typeof tags !== "string") {
+    res.status(400);
+    throw new Error("Tags must be a list or comma-separated string");
+  }
+  if (Array.isArray(tags) && tags.some((tag) => typeof tag !== "string")) {
+    res.status(400);
+    throw new Error("Each tag must be a string");
+  }
+  const tagList = toTagList(tags);
+  if (tagList.length > 10) {
+    res.status(400);
+    throw new Error("A post cannot have more than 10 tags");
+  }
 
   let post = await Post.create({
-    title,
+    title: title.trim(),
     content,
-    coverImage,
-    tags: toTagList(tags),
+    coverImage: coverImage.trim(),
+    tags: tagList,
     author: req.user._id,
   });
 
@@ -101,10 +147,43 @@ export const updatePost = asyncHandler(async (req, res) => {
   }
 
   const { title, content, coverImage, tags } = req.body;
-  if (title !== undefined) post.title = title;
-  if (content !== undefined) post.content = content;
-  if (coverImage !== undefined) post.coverImage = coverImage;
-  if (tags !== undefined) post.tags = toTagList(tags);
+  if (title !== undefined) {
+    if (typeof title !== "string") {
+      res.status(400);
+      throw new Error("Title must be a string");
+    }
+    post.title = title.trim();
+  }
+  if (content !== undefined) {
+    if (typeof content !== "string") {
+      res.status(400);
+      throw new Error("Content must be a string");
+    }
+    post.content = content;
+  }
+  if (coverImage !== undefined) {
+    if (typeof coverImage !== "string") {
+      res.status(400);
+      throw new Error("Cover image must be a URL");
+    }
+    post.coverImage = coverImage.trim();
+  }
+  if (tags !== undefined) {
+    if (!Array.isArray(tags) && typeof tags !== "string") {
+      res.status(400);
+      throw new Error("Tags must be a list or comma-separated string");
+    }
+    if (Array.isArray(tags) && tags.some((tag) => typeof tag !== "string")) {
+      res.status(400);
+      throw new Error("Each tag must be a string");
+    }
+    const tagList = toTagList(tags);
+    if (tagList.length > 10) {
+      res.status(400);
+      throw new Error("A post cannot have more than 10 tags");
+    }
+    post.tags = tagList;
+  }
 
   const updated = await post.save();
   const populated = await updated.populate("author", "name avatar");
@@ -136,26 +215,45 @@ export const deletePost = asyncHandler(async (req, res) => {
 // @route   PUT /api/posts/:id/like
 // @access  Private
 export const toggleLike = asyncHandler(async (req, res) => {
-  const post = await Post.findById(req.params.id);
+  const userId = req.user._id;
+  const post = await Post.findOneAndUpdate(
+    { _id: req.params.id },
+    [
+      {
+        $set: {
+          likes: {
+            $cond: [
+              { $in: [userId, { $ifNull: ["$likes", []] }] },
+              {
+                $filter: {
+                  input: { $ifNull: ["$likes", []] },
+                  as: "like",
+                  cond: { $ne: ["$$like", userId] },
+                },
+              },
+              {
+                $concatArrays: [
+                  { $ifNull: ["$likes", []] },
+                  [userId],
+                ],
+              },
+            ],
+          },
+        },
+      },
+    ],
+    { new: true, projection: { likes: 1 } }
+  );
 
   if (!post) {
     res.status(404);
     throw new Error("Post not found");
   }
 
-  const userId = String(req.user._id);
-  const alreadyLiked = post.likes.some((u) => String(u) === userId);
-
-  if (alreadyLiked) {
-    post.likes = post.likes.filter((u) => String(u) !== userId);
-  } else {
-    post.likes.push(req.user._id);
-  }
-
-  await post.save();
+  const liked = post.likes.some((id) => String(id) === String(userId));
   res.json({
     likes: post.likes,
     likesCount: post.likes.length,
-    liked: !alreadyLiked,
+    liked,
   });
 });

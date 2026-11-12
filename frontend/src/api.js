@@ -4,7 +4,10 @@ import axios from "axios";
 // which forwards every call to the Express backend on port 5000.
 // In production the API lives on its own URL, so set VITE_API_URL
 // (e.g. https://your-backend.onrender.com/api) in the host's env vars.
-const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || "/api" });
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || "/api",
+  timeout: 30000,
+});
 
 // Attach the saved JWT (if any) to every request
 api.interceptors.request.use((config) => {

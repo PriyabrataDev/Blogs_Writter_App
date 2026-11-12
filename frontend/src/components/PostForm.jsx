@@ -33,8 +33,8 @@ export default function PostForm({ initial = {}, onSubmit, submitLabel = "Save" 
   };
 
   return (
-    <form className="form" onSubmit={handleSubmit} noValidate>
-      {error && <p className="form-error">{error}</p>}
+    <form className="form form-panel" onSubmit={handleSubmit} noValidate>
+      {error && <p className="form-error" role="alert">{error}</p>}
 
       <label className="field">
         <span>Title</span>
@@ -44,6 +44,7 @@ export default function PostForm({ initial = {}, onSubmit, submitLabel = "Save" 
           placeholder="An interesting headline…"
           maxLength={150}
         />
+        <span className="field-hint">{title.length}/150 characters</span>
       </label>
 
       <label className="field">
@@ -54,6 +55,7 @@ export default function PostForm({ initial = {}, onSubmit, submitLabel = "Save" 
           value={coverImage}
           onChange={(e) => setCoverImage(e.target.value)}
           placeholder="https://images.example.com/photo.jpg"
+          maxLength={2048}
         />
       </label>
 
@@ -72,10 +74,14 @@ export default function PostForm({ initial = {}, onSubmit, submitLabel = "Save" 
         <span>Story</span>
         <textarea
           rows={12}
+          maxLength={50000}
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder="Tell your story…"
         />
+        <span className="field-hint">
+          Tip: use a blank line to separate paragraphs.
+        </span>
       </label>
 
       <button className="btn btn-gold" type="submit" disabled={submitting}>

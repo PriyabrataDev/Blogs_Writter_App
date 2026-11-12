@@ -1,4 +1,10 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import api from "../api.js";
 
 const AuthContext = createContext(null);
@@ -10,24 +16,37 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState("");
 
-  // Restore the session on page refresh
-  useEffect(() => {
+  const restoreSession = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) {
+      setUser(null);
+      setAuthError("");
       setLoading(false);
       return;
     }
 
-    api
-      .get("/auth/me")
-      .then(({ data }) => setUser(data))
-      .catch(() => {
+    setLoading(true);
+    setAuthError("");
+    try {
+      const { data } = await api.get("/auth/me");
+      setUser(data);
+    } catch (error) {
+      if (error.response?.status === 401) {
         localStorage.removeItem("token");
         setUser(null);
-      })
-      .finally(() => setLoading(false));
+      } else {
+        setAuthError("We couldn't verify your session. Check your connection and try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    restoreSession();
+  }, [restoreSession]);
 
   const login = async (email, password) => {
     const { data } = await api.post("/auth/login", { email, password });
@@ -46,15 +65,22 @@ export function AuthProvider({ children }) {
   const logout = () => {
     localStorage.removeItem("token");
     setUser(null);
+    setAuthError("");
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, login, register, logout }}
+      value={{ user, loading, authError, restoreSession, login, register, logout }}
     >
       {children}
     </AuthContext.Provider>
   );
 }
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+};

@@ -11,7 +11,13 @@ export default function Login() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const from = location.state?.from || "/";
+  const requestedPath = location.state?.from;
+  const from =
+    typeof requestedPath === "string" &&
+    requestedPath.startsWith("/") &&
+    !requestedPath.startsWith("//")
+      ? requestedPath
+      : "/";
 
   const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -30,17 +36,22 @@ export default function Login() {
   };
 
   return (
-    <div className="page-narrow">
+    <div className="page-narrow auth-page">
+      <p className="eyebrow">Inkwell community</p>
       <h1>Welcome back</h1>
+      <p className="form-intro">
+        Sign in to share a story or pick up where you left off.
+      </p>
 
-      <form className="form" onSubmit={onSubmit} noValidate>
-        {error && <p className="form-error">{error}</p>}
+      <form className="form form-panel" onSubmit={onSubmit} noValidate>
+        {error && <p className="form-error" role="alert">{error}</p>}
 
         <label className="field">
           <span>Email</span>
           <input
             type="email"
             name="email"
+            autoComplete="email"
             value={form.email}
             onChange={onChange}
             placeholder="you@example.com"
@@ -53,9 +64,10 @@ export default function Login() {
           <input
             type="password"
             name="password"
+            autoComplete="current-password"
             value={form.password}
             onChange={onChange}
-            placeholder="••••••"
+            placeholder="Your password"
             required
           />
         </label>

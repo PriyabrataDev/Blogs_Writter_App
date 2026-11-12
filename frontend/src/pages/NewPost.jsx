@@ -12,7 +12,11 @@ export default function NewPost() {
 
   return (
     <div className="page-narrow">
+      <p className="eyebrow">Your voice belongs here</p>
       <h1>Write a new post</h1>
+      <p className="form-intro">
+        Give your story a clear title, then write it in your own words.
+      </p>
       <PostForm onSubmit={submit} submitLabel="Publish" />
     </div>
   );

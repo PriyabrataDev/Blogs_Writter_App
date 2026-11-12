@@ -38,7 +38,11 @@ export default function EditPost() {
 
   return (
     <div className="page-narrow">
+      <p className="eyebrow">Make it yours</p>
       <h1>Edit post</h1>
+      <p className="form-intro">
+        Update your story and save your changes when you’re ready.
+      </p>
       <PostForm initial={post} onSubmit={submit} submitLabel="Save changes" />
     </div>
   );

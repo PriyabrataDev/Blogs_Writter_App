@@ -13,7 +13,14 @@ const generateToken = (id) =>
 export const registerUser = asyncHandler(async (req, res) => {
   const { name, email, password } = req.body;
 
-  if (!name?.trim() || !email?.trim() || !password) {
+  if (
+    typeof name !== "string" ||
+    typeof email !== "string" ||
+    typeof password !== "string" ||
+    !name.trim() ||
+    !email.trim() ||
+    !password
+  ) {
     res.status(400);
     throw new Error("Please provide name, email and password");
   }
@@ -21,14 +28,28 @@ export const registerUser = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error("Password must be at least 6 characters");
   }
+  if (Buffer.byteLength(password, "utf8") > 72) {
+    res.status(400);
+    throw new Error("Password cannot exceed 72 bytes");
+  }
 
-  const existing = await User.findOne({ email: email.toLowerCase() });
+  const normalizedEmail = email.trim().toLowerCase();
+  if (normalizedEmail.length > 254) {
+    res.status(400);
+    throw new Error("Email cannot exceed 254 characters");
+  }
+
+  const existing = await User.findOne({ email: normalizedEmail });
   if (existing) {
     res.status(409);
     throw new Error("An account with this email already exists");
   }
 
-  const user = await User.create({ name, email, password });
+  const user = await User.create({
+    name: name.trim(),
+    email: normalizedEmail,
+    password,
+  });
 
   res.status(201).json({
     _id: user._id,
@@ -45,14 +66,23 @@ export const registerUser = asyncHandler(async (req, res) => {
 export const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password) {
+  if (
+    typeof email !== "string" ||
+    typeof password !== "string" ||
+    !email.trim() ||
+    !password
+  ) {
     res.status(400);
     throw new Error("Please provide email and password");
   }
 
-  const user = await User.findOne({ email: email.toLowerCase() }).select(
-    "+password"
-  );
+  const normalizedEmail = email.trim().toLowerCase();
+  if (normalizedEmail.length > 254 || Buffer.byteLength(password, "utf8") > 1024) {
+    res.status(401);
+    throw new Error("Invalid email or password");
+  }
+
+  const user = await User.findOne({ email: normalizedEmail }).select("+password");
 
   if (user && (await user.matchPassword(password))) {
     res.json({
